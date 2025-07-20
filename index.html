@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Index API Coverage Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Slate -->
+    <!-- Application Structure Plan: The application is designed as a single-page interactive dashboard with three main, tab-navigated sections: 'Coverage Matrix', 'Pricing Summary', and 'Key Findings'. This structure was chosen over a linear report format to empower the user. It allows for non-linear exploration, enabling a user to quickly switch between comparing provider index coverage and their pricing, which are the two most critical decision factors. This task-oriented design (comparing coverage vs. comparing price) is more intuitive and efficient than scrolling through a long document. The 'Key Findings' section serves as an executive summary, providing top-level recommendations upfront. -->
+    <!-- Visualization & Content Choices: Report Info: A list of 18 financial indices and 11 API providers. Goal: Compare data coverage and pricing. Viz/Presentation Method: Interactive tables are used instead of charts. A matrix is the most direct and clear way to present binary (Yes/No) coverage data across two categories (providers and indices). A simple table is also clearest for summarizing pricing tiers, as much of the data is qualitative (e.g., 'Quote-based') and not suited for a quantitative chart. Interaction: Tabs control which table/section is visible. This is a simple, universally understood interaction model. Justification: For this type of comparative research data, clarity and directness are paramount. Complex visualizations would obscure the simple goal of checking which provider has which index. Tables excel at this. Library/Method: Vanilla JS for tab switching and DOM manipulation. TailwindCSS for styling and layout. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .tab-active {
+            border-bottom-color: #475569; /* slate-600 */
+            color: #0f172a; /* slate-900 */
+            font-weight: 600;
+        }
+        .tab-inactive {
+            border-bottom-color: transparent;
+            color: #475569; /* slate-600 */
+        }
+        .table-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table thead th {
+            background-color: #f1f5f9; /* slate-100 */
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        table tbody th {
+            position: sticky;
+            left: 0;
+            background-color: #f8fafc; /* slate-50 */
+            z-index: 5;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 220px;
+            background-color: #1e293b; /* slate-800 */
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 20;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -110px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            font-weight: 400;
+        }
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #1e293b transparent transparent transparent;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Financial Index API Coverage</h1>
+            <p class="mt-2 text-lg text-slate-600">An Interactive Research Summary</p>
+        </header>
+
+        <main>
+            <div class="border-b border-slate-300 mb-8">
+                <nav class="-mb-px flex space-x-6" id="tab-nav">
+                    <button data-tab="coverage" class="py-4 px-1 border-b-2 text-sm md:text-base tab-active">Coverage Matrix</button>
+                    <button data-tab="pricing" class="py-4 px-1 border-b-2 text-sm md:text-base tab-inactive">Pricing Summary</button>
+                    <button data-tab="summary" class="py-4 px-1 border-b-2 text-sm md:text-base tab-inactive">Key Findings</button>
+                </nav>
+            </div>
+
+            <div id="tab-content">
+                <section id="coverage-content">
+                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                        <h2 class="text-2xl font-semibold text-slate-900 mb-1">Index Coverage Matrix</h2>
+                        <p class="text-slate-600 mb-6">This table shows whether an API provider offers historical and end-of-day data for a specific index. Hover over footnotes for more details.</p>
+                        <div class="table-container">
+                            <table class="min-w-full border-collapse text-sm text-left">
+                                <thead id="coverage-thead"></thead>
+                                <tbody id="coverage-tbody"></tbody>
+                            </table>
+                        </div>
+                        <div id="footnotes" class="mt-6 text-sm text-slate-500 space-y-2">
+                             <h3 class="font-semibold text-slate-600 mt-4">Footnotes:</h3>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="pricing-content" class="hidden">
+                     <div class="bg-white p-6 rounded-lg shadow-sm">
+                        <h2 class="text-2xl font-semibold text-slate-900 mb-1">Provider Pricing Summary</h2>
+                        <p class="text-slate-600 mb-6">A summary of the pricing structures for each researched API provider. Costs are subject to change and enterprise plans are typically customized.</p>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full border-collapse text-sm">
+                                <thead>
+                                    <tr>
+                                        <th class="border-b-2 border-slate-200 p-3 text-left font-semibold text-slate-700 bg-slate-100">Provider</th>
+                                        <th class="border-b-2 border-slate-200 p-3 text-left font-semibold text-slate-700 bg-slate-100">Pricing Summary (Monthly/Annual Fees)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pricing-tbody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="summary-content" class="hidden">
+                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                        <h2 class="text-2xl font-semibold text-slate-900 mb-4">Key Findings & Summary</h2>
+                        <div class="space-y-4 text-slate-700 leading-relaxed">
+                            <p>The research indicates a clear division in the financial data API market. No single provider offers complete coverage for all 18 indices researched, especially the more specialized or proprietary ones.</p>
+                            
+                            <div>
+                                <h3 class="font-semibold text-lg text-slate-800 mb-2">Best for Broad-Market Indices:</h3>
+                                <p>Providers like <strong class="font-semibold">Polygon.io, Financial Modeling Prep, EODHD,</strong> and the free <strong class="font-semibold">yfinance</strong> library offer excellent coverage for major US market indices (S&P, Russell, Dow Jones, Wilshire). They are well-suited for applications focused on general market analysis and are often the most cost-effective options.</p>
+                            </div>
+
+                            <div>
+                                <h3 class="font-semibold text-lg text-slate-800 mb-2">Best for Specialized & Total Return (TR) Indices:</h3>
+                                <p>For comprehensive access, including Total Return versions, MSCI data, fixed income, and other specialized indices (e.g., Natural Resources, MLPs), enterprise-grade providers are necessary. <strong class="font-semibold">FactSet, LSEG (Eikon), and Exchange Data International (EDI)</strong> are designed for institutional use and have the most extensive datasets. <strong class="font-semibold">Intrinio</strong> positions itself as a more accessible alternative for this tier of data, offering broader coverage than retail-focused APIs at a higher price point.</p>
+                            </div>
+
+                            <div>
+                                <h3 class="font-semibold text-lg text-slate-800 mb-2">Coverage Gaps:</h3>
+                                <p>A significant gap exists for proprietary, non-public data. The <strong class="font-semibold">NCREIF Property Index</strong> is a prime example; this type of data is typically licensed directly from the source organization and not available through standard financial data aggregators. Similarly, specific High-Yield bond indices and some granular S&P/MSCI series are often exclusive to premium, institutional platforms.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    const indexData = {
+        headers: [
+            "S&P 500 TR", "Russell 3000 TR", "Russell 2000 TR", "Russell 1000 TR", "DJTSM US TR",
+            "S&P 500", "MSCI ACWI", "Wilshire 5000", "US HY Constrained", "MSCI ACWI xUSA",
+            "US Corp HY", "NCREIF Property", "S&P Global NatRes", "S&P N AMER NAT RES",
+            "ALERIAN MLP TR", "MSCI USA Small Cap", "MSCI US REIT", "WrldSel NaturlRes"
+        ],
+        tickers: [
+            "SPTR", "RU30INTR", "RU20INTR", "RU10INTR", "DWCFT", "SPX", "MXWD", "W5000",
+            "HUC0", "MXWDU", "LF98TRUU", "NPNCRE", "SPGNRUT", "SPGSSINR", "AMZX",
+            "MXUSSC", "RMZ", "MXCXTRW"
+        ],
+        providers: [
+            { name: "Intrinio", data: ["Yes¹", "Yes¹", "Yes¹", "Yes¹", "Yes", "Yes", "Yes²", "Yes", "Yes³", "Yes²", "Yes³", "No", "Yes²", "Yes²", "Yes²", "Yes²", "Yes²", "Yes²"] },
+            { name: "Polygon.io", data: ["Yes¹", "Yes", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "No", "No", "No", "No", "No", "No", "No", "No", "No", "No"] },
+            { name: "Financial Modeling Prep", data: ["Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes²", "Yes", "No", "Yes²", "No", "No", "Some⁴", "Some⁴", "Yes⁵", "Yes²", "Yes²", "No"] },
+            { name: "FactSet", data: ["Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes⁶", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes"] },
+            { name: "yfinance (Yahoo Finance)", data: ["Yes¹", "Yes¹", "Yes¹", "Yes¹", "Yes¹", "Yes", "Yes¹", "Yes", "No", "Yes¹", "No", "No", "Yes⁵", "Yes⁵", "Yes⁵", "Yes⁵", "Yes⁵", "No"] },
+            { name: "EOD Historical Data", data: ["Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes²", "Yes", "No", "Yes²", "No", "No", "Some⁴", "No", "Yes⁵", "Yes²", "Yes²", "No"] },
+            { name: "Exchange Data Int. (EDI)", data: ["Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes⁶", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes"] },
+            { name: "Finnhub", data: ["Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "No", "Yes", "No", "No", "No", "No", "No", "No", "No", "No", "No", "No"] },
+            { name: "LSEG (Eikon)", data: ["Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes⁶", "Yes", "Yes", "Yes", "Yes", "Yes", "Yes"] },
+            { name: "Alpha Vantage", data: ["Yes¹", "No", "Yes¹", "No", "No", "Yes", "No", "No", "No", "No", "No", "No", "No", "No", "No", "No", "No", "No"] },
+            { name: "IEX Cloud", data: ["PR Only", "PR Only", "PR Only", "PR Only", "PR Only", "Yes", "No", "PR Only", "No", "No", "No", "No", "No", "No", "No", "No", "No", "No"] }
+        ],
+        footnotes: [
+            { id: "1", text: "Total Return (TR) data often found via a separate ticker (e.g., ^SP500TR on Yahoo Finance) or specific API parameter." },
+            { id: "2", text: "MSCI data access requires a specific (and often expensive) license/data package from the provider." },
+            { id: "3", text: "Fixed income and high-yield bond data is typically part of a specialized, higher-cost data feed." },
+            { id: "4", text: "Coverage for sector/commodity indices can be inconsistent; often available through related ETFs rather than the index itself." },
+            { id: "5", text: "Coverage often available via a corresponding ETF ticker (e.g., AMLP for Alerian MLP, SPY for S&P 500)." },
+            { id: "6", text: "Proprietary data like NCREIF requires a direct license, which these institutional providers can facilitate or integrate." }
+        ]
+    };
+    
+    const pricingData = [
+        { provider: "Intrinio", summary: "Tiered pricing. Starts from ~$200/mo for basic data. Real-time and specialized data (e.g., MSCI) significantly increases cost. Enterprise plans are quote-based." },
+        { provider: "Polygon.io", summary: "Free tier for personal use (delayed data). Paid tiers start at $99/mo for real-time US stock data. Indices are part of higher tiers or add-on packages." },
+        { provider: "Financial Modeling Prep", summary: "Generous free tier. Paid plans start from $19/mo (Starter) to $149/mo (Professional) and higher for enterprise use, offering more API calls and broader data access." },
+        { provider: "FactSet", summary: "Enterprise only. Pricing is quote-based and tailored to institutional clients. Typically ranges from $10,000s to $100,000s+ annually." },
+        { provider: "yfinance (Yahoo Finance)", summary: "Free. It's a Python library that scrapes data from Yahoo Finance. No official support or SLA. Subject to Yahoo's terms of service and potential rate limiting." },
+        { provider: "EOD Historical Data", summary: "Free tier available. Paid plans range from ~$30/mo (All-In-One) to ~$100/mo for more comprehensive data and higher API limits. Enterprise plans available." },
+        { provider: "Exchange Data Int. (EDI)", summary: "Enterprise only. Pricing is quote-based, focused on providing high-quality, global reference and closing price data to institutions." },
+        { provider: "Finnhub", summary: "Free tier for low-volume use. Paid tiers range from $50/mo to $600/mo+ for institutional-grade access with higher API call limits and more data types." },
+        { provider: "LSEG (Eikon)", summary: "Enterprise only. Quote-based pricing for institutional clients, comparable to FactSet and Bloomberg Terminal subscriptions." },
+        { provider: "Alpha Vantage", summary: "Free tier with daily limits. Premium plans start at ~$50/mo, offering higher API call frequency and more endpoints." },
+        { provider: "IEX Cloud", summary: "Free tier with message-based credits. Paid plans start at $19/mo. Pricing is based on 'messages' (API calls and data weight)." },
+    ];
+
+
+    function createTooltip(text, footnoteId) {
+        const sup = document.createElement('sup');
+        sup.className = 'font-bold';
+        sup.textContent = footnoteId;
+        
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        
+        const tooltipText = document.createElement('span');
+        tooltipText.className = 'tooltiptext';
+        tooltipText.textContent = text;
+        
+        tooltip.appendChild(sup);
+        tooltip.appendChild(tooltipText);
+        
+        return tooltip;
+    }
+
+    function renderCoverageTable() {
+        const thead = document.getElementById('coverage-thead');
+        const tbody = document.getElementById('coverage-tbody');
+        const footnotesContainer = document.getElementById('footnotes');
+        
+        let headerHtml = '<tr><th class="p-3 border-b-2 border-slate-200 w-40 text-left font-semibold text-slate-700">Provider</th>';
+        indexData.headers.forEach((header, i) => {
+            headerHtml += `<th class="p-3 border-b-2 border-slate-200 min-w-[150px] text-center font-semibold text-slate-700"><div>${header}</div><div class="font-normal text-slate-500">${indexData.tickers[i]}</div></th>`;
+        });
+        headerHtml += '</tr>';
+        thead.innerHTML = headerHtml;
+
+        let bodyHtml = '';
+        indexData.providers.forEach(provider => {
+            bodyHtml += '<tr>';
+            bodyHtml += `<th class="p-3 border-b border-slate-200 text-left font-semibold text-slate-800">${provider.name}</th>`;
+            provider.data.forEach(cell => {
+                let cellContent = cell;
+                let cellClass = 'text-slate-700';
+                
+                if (cell.toLowerCase() === 'yes') {
+                    cellContent = 'Yes';
+                    cellClass = 'text-green-600 font-semibold';
+                } else if (cell.toLowerCase() === 'no') {
+                    cellContent = 'No';
+                    cellClass = 'text-red-600';
+                } else if (cell.toLowerCase() === 'pr only') {
+                    cellContent = 'PR Only';
+                    cellClass = 'text-amber-600';
+                } else {
+                     cellClass = 'text-blue-600';
+                }
+
+                const footnoteMatch = cell.match(/(\d+)/);
+                if (footnoteMatch) {
+                    const footnoteId = footnoteMatch[1];
+                    const footnote = indexData.footnotes.find(f => f.id === footnoteId);
+                    const baseText = cell.replace(/¹|²|³|⁴|⁵|⁶/g, '');
+                    const hasText = baseText.trim().toLowerCase() !== "yes" && baseText.trim().toLowerCase() !== "no";
+                    
+                    let displayContent = '';
+                    if (hasText) {
+                         displayContent = `<span class="${cellClass}">${baseText}</span>`;
+                    } else {
+                        displayContent = `<span class="${cellClass}">${cellContent}</span>`;
+                    }
+
+                    const tooltip = createTooltip(footnote.text, footnote.id);
+                    bodyHtml += `<td class="p-3 border-b border-slate-200 text-center">${displayContent} ${tooltip.outerHTML}</td>`;
+                } else {
+                    bodyHtml += `<td class="p-3 border-b border-slate-200 text-center ${cellClass}">${cellContent}</td>`;
+                }
+            });
+            bodyHtml += '</tr>';
+        });
+        tbody.innerHTML = bodyHtml;
+        
+        let footnotesHtml = '<h3 class="font-semibold text-slate-600 mt-4">Footnotes:</h3>';
+        indexData.footnotes.forEach(f => {
+            footnotesHtml += `<p><strong>${f.id}:</strong> ${f.text}</p>`;
+        });
+        footnotesContainer.innerHTML = footnotesHtml;
+    }
+
+    function renderPricingTable() {
+        const tbody = document.getElementById('pricing-tbody');
+        let bodyHtml = '';
+        pricingData.forEach(item => {
+            bodyHtml += `<tr class="hover:bg-slate-50">
+                <td class="p-3 border-b border-slate-200 font-semibold text-slate-800 w-1/4">${item.provider}</td>
+                <td class="p-3 border-b border-slate-200 text-slate-600">${item.summary}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = bodyHtml;
+    }
+    
+    function handleTabSwitching() {
+        const nav = document.getElementById('tab-nav');
+        const content = document.getElementById('tab-content');
+        const tabs = nav.querySelectorAll('button');
+        const sections = content.querySelectorAll('section');
+
+        nav.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                const tabName = e.target.dataset.tab;
+
+                tabs.forEach(tab => {
+                    tab.classList.remove('tab-active');
+                    tab.classList.add('tab-inactive');
+                });
+                e.target.classList.add('tab-active');
+                e.target.classList.remove('tab-inactive');
+
+                sections.forEach(section => {
+                    if (section.id === `${tabName}-content`) {
+                        section.classList.remove('hidden');
+                    } else {
+                        section.classList.add('hidden');
+                    }
+                });
+            }
+        });
+    }
+
+    renderCoverageTable();
+    renderPricingTable();
+    handleTabSwitching();
+});
+</script>
+
+</body>
+</html>
